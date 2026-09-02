@@ -204,7 +204,7 @@ export async function createVerification(input: {
       now,
     ],
   });
-  return (await getVerification(input.id))!;
+  return (await getVerification(input.id, input.ownerHash))!;
 }
 
 export async function getVerification(id: string, ownerHash: string) {
