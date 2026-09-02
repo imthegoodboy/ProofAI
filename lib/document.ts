@@ -70,7 +70,12 @@ export async function extractDocument(
       import("exifr"),
     ]);
     const [ocr, imageMeta] = await Promise.all([
-      recognize(buffer, "eng", { logger: () => undefined }),
+      recognize(buffer, "eng", {
+        logger: () => undefined,
+        langPath: process.cwd(),
+        cacheMethod: "none",
+        gzip: false,
+      }),
       exifr.parse(buffer).catch(() => null),
     ]);
     return {
