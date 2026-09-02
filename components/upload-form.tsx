@@ -38,7 +38,7 @@ export function UploadForm() {
       return;
     }
     if (nextFile.size > maxBytes) {
-      setError("The document exceeds the 12 MB limit.");
+      setError("The document exceeds the 4 MB limit.");
       return;
     }
     setFile(nextFile);
