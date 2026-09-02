@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { analyzeDocument } from "@/lib/analysis";
 import { extractDocument, sha256 } from "@/lib/document";
@@ -8,16 +7,31 @@ import {
   updateVerification,
 } from "@/lib/db";
 import { persistVerificationOn0G } from "@/lib/og";
+import { checkRateLimit, getSessionHash, isSameOrigin } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  const existing = getVerification(id);
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Cross-origin requests are not allowed." }, { status: 403 });
+  }
+  const rate = await checkRateLimit(request, "analyze", 12, 60 * 60 * 1000);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Analysis limit reached. Try again later." },
+      { status: 429, headers: { "retry-after": String(rate.retryAfter) } },
+    );
+  }
+  const ownerHash = await getSessionHash();
+  if (!ownerHash) {
+    return NextResponse.json({ error: "Verification not found." }, { status: 404 });
+  }
+  const existing = await getVerification(id, ownerHash);
   if (!existing) {
     return NextResponse.json({ error: "Verification not found." }, { status: 404 });
   }
@@ -35,21 +49,24 @@ export async function POST(
   }
 
   try {
-    updateVerification(id, {
+    await updateVerification(id, ownerHash, {
       status: "processing",
       currentStep: "Fingerprinting document",
       progress: 14,
     });
-    const document = await fs.readFile(existing.filePath);
+    if (!existing.document) {
+      throw new Error("The private document copy is no longer available for analysis.");
+    }
+    const document = Buffer.from(existing.document);
     const documentHash = sha256(document);
-    updateVerification(id, {
+    await updateVerification(id, ownerHash, {
       documentHash,
       currentStep: "Extracting document content",
       progress: 28,
     });
 
     const extraction = await extractDocument(document, existing.mimeType);
-    updateVerification(id, {
+    await updateVerification(id, ownerHash, {
       extractedText: extraction.text,
       currentStep: "Checking structure and metadata",
       progress: 46,
@@ -61,7 +78,7 @@ export async function POST(
       extraction,
       evidenceUrls: existing.evidenceUrls,
     });
-    updateVerification(id, {
+    await updateVerification(id, ownerHash, {
       extractedData: analysis.extracted,
       proofScore: analysis.proofScore,
       riskLevel: analysis.riskLevel,
@@ -88,7 +105,7 @@ export async function POST(
       disclaimer:
         "ProofAI assesses document consistency and available evidence; it does not guarantee legal authenticity.",
     };
-    updateVerification(id, {
+    await updateVerification(id, ownerHash, {
       currentStep: "Writing encrypted evidence to 0G",
       progress: 81,
     });
@@ -100,8 +117,10 @@ export async function POST(
       riskLevel: analysis.riskLevel,
       report,
     });
-    const completed = updateVerification(id, {
+    const completed = await updateVerification(id, ownerHash, {
       ...persistence,
+      document: persistence.storageDocumentRoot ? null : existing.document,
+      extractedText: null,
       status: "complete",
       currentStep: persistence.chainTxHash
         ? "Verification anchored on 0G"
@@ -112,7 +131,7 @@ export async function POST(
   } catch (error) {
     console.error(`Verification ${id} failed:`, error);
     const message = error instanceof Error ? error.message : "Verification failed.";
-    const failed = updateVerification(id, {
+    const failed = await updateVerification(id, ownerHash, {
       status: "failed",
       currentStep: message,
     });
