@@ -20,7 +20,6 @@ function validSeverity(value: unknown): value is Finding["severity"] {
 export async function reviewWithAi(
   text: string,
   extracted: ExtractedData,
-): Promise<{ provider: "openai" | "local"; review: AiReview }> {
 ): Promise<{ provider: "0g-compute" | "openai" | "local"; review: AiReview }> {
   const provider = config.compute.apiKey
     ? {
