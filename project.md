@@ -4,6 +4,7 @@
 
 ### One-line idea
 
+
 > **ProofAI is an AI verification agent that analyzes documents, detects possible fraud or manipulation, gathers supporting evidence, and creates a tamper-resistant verification record using 0G.**
 
 The key idea is:
