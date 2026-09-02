@@ -37,6 +37,7 @@ async function initializeDatabase() {
     [
       `CREATE TABLE IF NOT EXISTS verifications (
         id TEXT PRIMARY KEY,
+        owner_hash TEXT NOT NULL DEFAULT '',
         original_name TEXT NOT NULL,
         file_path TEXT NOT NULL DEFAULT '',
         document_blob BLOB,
@@ -84,6 +85,7 @@ async function initializeDatabase() {
   for (const statement of [
     "ALTER TABLE verifications ADD COLUMN document_blob BLOB",
     "ALTER TABLE verifications ADD COLUMN chain_contract_address TEXT",
+    "ALTER TABLE verifications ADD COLUMN owner_hash TEXT NOT NULL DEFAULT ''",
   ]) {
     try {
       await db.execute(statement);
@@ -116,6 +118,7 @@ function toBytes(value: unknown) {
 function mapRow(row: Row): InternalVerification {
   return {
     id: String(row.id),
+    ownerHash: String(row.owner_hash),
     originalName: String(row.original_name),
     document: toBytes(row.document_blob),
     mimeType: String(row.mime_type),
@@ -159,12 +162,14 @@ function mapRow(row: Row): InternalVerification {
 export function toPublicVerification(record: InternalVerification): Verification {
   const {
     document: _document,
+    ownerHash: _ownerHash,
     extractedText: _text,
     evidenceUrls: _urls,
     storageKey: _key,
     ...safe
   } = record;
   void _document;
+  void _ownerHash;
   void _text;
   void _urls;
   void _key;
@@ -173,6 +178,7 @@ export function toPublicVerification(record: InternalVerification): Verification
 
 export async function createVerification(input: {
   id: string;
+  ownerHash: string;
   originalName: string;
   document: Uint8Array;
   mimeType: string;
@@ -183,11 +189,12 @@ export async function createVerification(input: {
   const now = new Date().toISOString();
   await db.execute({
     sql: `INSERT INTO verifications (
-      id, original_name, file_path, document_blob, mime_type, document_type,
+      id, owner_hash, original_name, file_path, document_blob, mime_type, document_type,
       evidence_urls, status, current_step, progress, created_at, updated_at
-    ) VALUES (?, ?, '', ?, ?, ?, ?, 'uploaded', 'Document received', 6, ?, ?)`,
+    ) VALUES (?, ?, ?, '', ?, ?, ?, ?, 'uploaded', 'Document received', 6, ?, ?)`,
     args: [
       input.id,
+      input.ownerHash,
       input.originalName,
       input.document,
       input.mimeType,
@@ -200,27 +207,29 @@ export async function createVerification(input: {
   return (await getVerification(input.id))!;
 }
 
-export async function getVerification(id: string) {
+export async function getVerification(id: string, ownerHash: string) {
   await ready;
   const result = await db.execute({
-    sql: "SELECT * FROM verifications WHERE id = ?",
-    args: [id],
+    sql: "SELECT * FROM verifications WHERE id = ? AND owner_hash = ?",
+    args: [id, ownerHash],
   });
   return result.rows[0] ? mapRow(result.rows[0]) : null;
 }
 
-export async function listVerifications(limit = 50) {
+export async function listVerifications(ownerHash: string | null, limit = 50) {
   await ready;
+  if (!ownerHash) return [];
   const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 100);
   const result = await db.execute({
-    sql: "SELECT * FROM verifications ORDER BY created_at DESC LIMIT ?",
-    args: [safeLimit],
+    sql: "SELECT * FROM verifications WHERE owner_hash = ? ORDER BY created_at DESC LIMIT ?",
+    args: [ownerHash, safeLimit],
   });
   return result.rows.map(mapRow);
 }
 
 const columns: Record<keyof InternalVerification, string> = {
   id: "id",
+  ownerHash: "owner_hash",
   originalName: "original_name",
   document: "document_blob",
   mimeType: "mime_type",
@@ -262,11 +271,12 @@ const jsonFields = new Set<keyof InternalVerification>([
 
 export async function updateVerification(
   id: string,
+  ownerHash: string,
   patch: Partial<Omit<InternalVerification, "id" | "createdAt">>,
 ) {
   await ready;
   const entries = Object.entries(patch) as [keyof InternalVerification, unknown][];
-  if (!entries.length) return getVerification(id);
+  if (!entries.length) return getVerification(id, ownerHash);
   const set = entries.map(([key]) => `${columns[key]} = ?`);
   const values = entries.map(([key, value]) => {
     const serialized = jsonFields.has(key) ? JSON.stringify(value) : value;
@@ -285,10 +295,10 @@ export async function updateVerification(
   set.push("updated_at = ?");
   values.push(new Date().toISOString());
   await db.execute({
-    sql: `UPDATE verifications SET ${set.join(", ")} WHERE id = ?`,
-    args: [...values, id],
+    sql: `UPDATE verifications SET ${set.join(", ")} WHERE id = ? AND owner_hash = ?`,
+    args: [...values, id, ownerHash],
   });
-  return getVerification(id);
+  return getVerification(id, ownerHash);
 }
 
 export async function countOtherRecordsWithHash(hash: string, currentId: string) {

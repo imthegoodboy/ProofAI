@@ -63,6 +63,7 @@ export interface Verification {
 }
 
 export interface InternalVerification extends Verification {
+  ownerHash: string;
   document: Uint8Array | null;
   extractedText: string | null;
   evidenceUrls: string[];
