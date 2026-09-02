@@ -14,12 +14,14 @@ import { RiskBadge } from "@/components/status-badge";
 import { config } from "@/lib/config";
 import { getVerification } from "@/lib/db";
 import { formatDate, truncateHash } from "@/lib/format";
+import { getSessionHash } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProofPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const record = getVerification(id);
+  const ownerHash = await getSessionHash();
+  const record = ownerHash ? await getVerification(id, ownerHash) : null;
   if (!record) notFound();
   if (record.status !== "complete") redirect(`/verify/${id}`);
   const anchored = Boolean(record.chainTxHash);

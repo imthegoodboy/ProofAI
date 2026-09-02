@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getVerification } from "@/lib/db";
+import { getSessionHash } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -8,7 +9,8 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  const record = getVerification(id);
+  const ownerHash = await getSessionHash();
+  const record = ownerHash ? await getVerification(id, ownerHash) : null;
   if (!record || record.status !== "complete") {
     return NextResponse.json({ error: "Completed report not found." }, { status: 404 });
   }

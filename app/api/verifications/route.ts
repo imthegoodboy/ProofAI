@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { config, getIntegrationStatus } from "@/lib/config";
@@ -8,6 +7,12 @@ import {
   listVerifications,
   toPublicVerification,
 } from "@/lib/db";
+import {
+  checkRateLimit,
+  getOrCreateSessionHash,
+  getSessionHash,
+  isSameOrigin,
+} from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,9 +42,7 @@ function matchesFileSignature(buffer: Buffer, mimeType: string) {
 }
 
 function createId() {
-  const time = Date.now().toString(36).toUpperCase();
-  const entropy = crypto.randomBytes(3).toString("hex").toUpperCase();
-  return `PF-${time}-${entropy}`;
+  return `PF-${crypto.randomBytes(10).toString("hex").toUpperCase()}`;
 }
 
 function getEvidenceUrls(value: FormDataEntryValue | null) {
@@ -58,14 +61,26 @@ function getEvidenceUrls(value: FormDataEntryValue | null) {
 }
 
 export async function GET() {
+  const ownerHash = await getSessionHash();
   return NextResponse.json({
-    verifications: listVerifications().map(toPublicVerification),
+    verifications: (await listVerifications(ownerHash)).map(toPublicVerification),
     integrations: getIntegrationStatus(),
   });
 }
 
 export async function POST(request: Request) {
   try {
+    if (!isSameOrigin(request)) {
+      return NextResponse.json({ error: "Cross-origin uploads are not allowed." }, { status: 403 });
+    }
+    const rate = await checkRateLimit(request, "upload", 8, 60 * 60 * 1000);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Upload limit reached. Try again later." },
+        { status: 429, headers: { "retry-after": String(rate.retryAfter) } },
+      );
+    }
+    const ownerHash = await getOrCreateSessionHash();
     const form = await request.formData();
     const file = form.get("document");
     if (!(file instanceof File)) {
@@ -104,15 +119,11 @@ export async function POST(request: Request) {
       : "other";
     const evidenceUrls = getEvidenceUrls(form.get("evidenceUrls"));
     const id = createId();
-    const uploadDir = path.join(config.dataDir, "uploads", id);
-    await fs.mkdir(uploadDir, { recursive: true });
-    const safeExtension = Object.entries(mimeByExtension).find(([, type]) => type === mimeType)?.[0] || extension;
-    const filePath = path.join(uploadDir, `document${safeExtension}`);
-    await fs.writeFile(filePath, buffer);
-    const record = createVerification({
+    const record = await createVerification({
       id,
+      ownerHash,
       originalName: path.basename(file.name).slice(0, 240),
-      filePath,
+      document: buffer,
       mimeType,
       documentType,
       evidenceUrls,

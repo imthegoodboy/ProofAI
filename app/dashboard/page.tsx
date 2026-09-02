@@ -13,12 +13,14 @@ import { getIntegrationStatus } from "@/lib/config";
 import { listVerifications } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { getOgNetworkHealth } from "@/lib/network";
+import { getSessionHash } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const ownerHash = await getSessionHash();
   const [records, network] = await Promise.all([
-    Promise.resolve(listVerifications(25)),
+    listVerifications(ownerHash, 25),
     getOgNetworkHealth(),
   ]);
   const integrations = getIntegrationStatus();

@@ -13,6 +13,7 @@ import { ScoreRing } from "@/components/score-ring";
 import { RiskBadge } from "@/components/status-badge";
 import { getVerification } from "@/lib/db";
 import { formatDate } from "@/lib/format";
+import { getSessionHash } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,8 @@ const CheckIcon = ({ status }: { status: string }) => {
 
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const record = getVerification(id);
+  const ownerHash = await getSessionHash();
+  const record = ownerHash ? await getVerification(id, ownerHash) : null;
   if (!record) notFound();
   if (record.status !== "complete") redirect(`/verify/${id}`);
 

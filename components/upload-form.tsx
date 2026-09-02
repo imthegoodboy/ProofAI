@@ -13,7 +13,7 @@ import {
 
 const documentTypes = ["Certificate", "Invoice", "License", "Report", "Other"];
 const supportedTypes = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
-const maxBytes = 12 * 1024 * 1024;
+const maxBytes = 4 * 1024 * 1024;
 
 function sizeLabel(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -78,7 +78,7 @@ export function UploadForm() {
         <div className="form-section">
           <div className="form-section-heading">
             <span>01</span>
-            <div><h2>Document</h2><p>One file, up to 12 MB</p></div>
+            <div><h2>Document</h2><p>One file, up to 4 MB</p></div>
           </div>
           <div
             className={`drop-zone ${dragging ? "dragging" : ""} ${file ? "has-file" : ""}`}

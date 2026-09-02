@@ -13,7 +13,7 @@ import {
 import type { Verification } from "@/lib/types";
 
 const steps = [
-  { at: 6, label: "Document received", detail: "Encrypted local copy created", icon: FileText },
+  { at: 6, label: "Document received", detail: "Private session copy secured", icon: FileText },
   { at: 14, label: "Fingerprint generated", detail: "SHA-256 content identity", icon: Fingerprint },
   { at: 28, label: "Content extracted", detail: "Text, fields, dates, and claims", icon: MagnifyingGlass },
   { at: 46, label: "Consistency reviewed", detail: "Structure, metadata, and reuse", icon: ShieldCheck },
