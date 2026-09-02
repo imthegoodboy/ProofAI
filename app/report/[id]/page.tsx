@@ -90,7 +90,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <div><span>Document ID</span><strong>{record.extractedData?.documentId || "Not detected"}</strong></div>
           <div><span>Issuing authority</span><strong>{record.extractedData?.issuingAuthority || "Not detected"}</strong></div>
           <div><span>Pages</span><strong>{record.extractedData?.pageCount || "—"}</strong></div>
-          <div><span>AI reasoning</span><strong>{record.aiProvider === "openai" ? "Configured model" : "Local checks only"}</strong></div>
+          <div><span>AI reasoning</span><strong>{record.aiProvider === "0g-compute" ? "0G Compute" : record.aiProvider === "openai" ? "OpenAI" : "Local checks only"}</strong></div>
         </div>
         <div className="claim-block">
           <span>Extracted claims</span>

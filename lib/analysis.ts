@@ -220,7 +220,7 @@ export async function analyzeDocument(input: {
     evidenceCheck(evidence),
   ];
 
-  if (ai.provider === "openai") {
+  if (ai.provider !== "local") {
     checks.push({
       id: "ai-review",
       label: "AI consistency review",

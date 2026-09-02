@@ -21,14 +21,29 @@ export async function reviewWithAi(
   text: string,
   extracted: ExtractedData,
 ): Promise<{ provider: "openai" | "local"; review: AiReview }> {
-  if (!config.openai.apiKey) return { provider: "local", review: emptyReview };
+): Promise<{ provider: "0g-compute" | "openai" | "local"; review: AiReview }> {
+  const provider = config.compute.apiKey
+    ? {
+        name: "0g-compute" as const,
+        apiKey: config.compute.apiKey,
+        baseURL: config.compute.baseUrl,
+        model: config.compute.model,
+      }
+    : config.openai.apiKey
+      ? {
+          name: "openai" as const,
+          apiKey: config.openai.apiKey,
+          baseURL: undefined,
+          model: config.openai.model,
+        }
+      : null;
+  if (!provider) return { provider: "local", review: emptyReview };
 
   try {
     const { default: OpenAI } = await import("openai");
-    const client = new OpenAI({ apiKey: config.openai.apiKey });
+    const client = new OpenAI({ apiKey: provider.apiKey, baseURL: provider.baseURL });
     const completion = await client.chat.completions.create({
-      model: config.openai.model,
-      response_format: { type: "json_object" },
+      model: provider.model,
       temperature: 0.1,
       messages: [
         {
@@ -48,7 +63,7 @@ export async function reviewWithAi(
     });
     const raw = completion.choices[0]?.message.content;
     if (!raw) return { provider: "local", review: emptyReview };
-    const parsed = JSON.parse(raw) as Partial<AiReview>;
+    const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")) as Partial<AiReview>;
     const findings = Array.isArray(parsed.findings)
       ? parsed.findings
           .filter(
@@ -67,7 +82,7 @@ export async function reviewWithAi(
       : [];
     const rawAdjustment = Number(parsed.scoreAdjustment || 0);
     return {
-      provider: "openai",
+      provider: provider.name,
       review: {
         findings,
         additionalClaims,
