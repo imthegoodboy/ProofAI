@@ -949,20 +949,4 @@ I would describe your project like this:
 
 > **ProofAI is an autonomous AI verification agent that investigates documents and their claims, detects inconsistencies and potential fraud, gathers supporting evidence, generates an explainable trust score, stores verification evidence on 0G, and creates a tamper-resistant proof record on-chain.**
 
-And importantly, it isn't **just an AI project**.
-
-It's:
-
-**🤖 AI Agent**
-+
-**🛡️ Trust & Safety**
-+
-**⛓️ Web3**
-+
-**💾 Decentralized Storage**
-+
-**🌍 Real-world verification**
-
-That combination is exactly what I'd target for this buildathon. 
-
-If you're building this as a student/hackathon team, **I would start with certificate/document verification rather than trying to support every type of document**. It keeps the MVP achievable while still giving you a very impressive demo.
+ 
